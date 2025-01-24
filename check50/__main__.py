@@ -3,29 +3,26 @@ import contextlib
 import enum
 import gettext
 import importlib
-import inspect
-import itertools
-from json import JSONDecodeError
+import json
 import logging
 import os
 import platform
 import site
-from pathlib import Path
-import shutil
-import signal
 import subprocess
 import sys
 import tempfile
 import time
+from json import JSONDecodeError
+from pathlib import Path
 
 import attr
 import lib50
 import requests
 import termcolor
 
-from . import _exceptions, internal, renderer, __version__
-from .contextmanagers import nullcontext
-from .runner import CheckRunner
+from check50 import _exceptions, internal, renderer, __version__
+from check50.contextmanagers import nullcontext
+from check50.runner import CheckRunner
 
 LOGGER = logging.getLogger("check50")
 
@@ -333,6 +330,7 @@ def main():
 
     # Set excepthook
     _exceptions.ExceptHook.initialize(args.output, args.output_file)
+    stdout = sys.stdout
 
     # If remote, push files to GitHub and await results
     if not args.local:
@@ -375,18 +373,28 @@ def main():
             included_files = lib50.files(config.get("files"))[0]
 
             # Create a working_area (temp dir) named - with all included student files
-            with CheckRunner(checks_file, included_files) as check_runner, \
-                    contextlib.redirect_stdout(LoggerWriter(LOGGER, logging.NOTSET)), \
-                    contextlib.redirect_stderr(LoggerWriter(LOGGER, logging.NOTSET)):
+            # with CheckRunner(checks_file, included_files) as check_runner, \
+            #         contextlib.redirect_stdout(LoggerWriter(LOGGER, logging.NOTSET)), \
+            #         contextlib.redirect_stderr(LoggerWriter(LOGGER, logging.NOTSET)):
+            #
+            #     check_results = check_runner.run(args.target)
+            #     results = {
+            #         "slug": internal.slug,
+            #         "results": [attr.asdict(result) for result in check_results],
+            #         "version": __version__
+            #     }
 
+            with CheckRunner(checks_file, included_files) as check_runner:
                 check_results = check_runner.run(args.target)
                 results = {
                     "slug": internal.slug,
                     "results": [attr.asdict(result) for result in check_results],
-                    "version": __version__
+                    "version": __version__,
                 }
-
+    sys.stdout = stdout
+    print('hello')
     LOGGER.debug(results)
+    print(f'{json.dumps(results, indent=4)}')
 
     # Render output
     file_manager = open(args.output_file, "w") if args.output_file else nullcontext(sys.stdout)

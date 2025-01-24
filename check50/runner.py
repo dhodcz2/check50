@@ -1,4 +1,5 @@
 import collections
+from collections import deque
 from contextlib import contextmanager
 import concurrent.futures as futures
 import enum
@@ -21,6 +22,8 @@ import lib50
 
 from . import internal, _exceptions, __version__
 from ._api import log, Failure, _copy, _log, _data
+# import sleep
+from time import sleep
 
 _check_names = []
 
@@ -35,6 +38,7 @@ class CheckResult:
     cause = attr.ib(default=None)
     data = attr.ib(default=attr.Factory(dict))
     dependency = attr.ib(default=None)
+    points = attr.ib(default=None)
 
     @classmethod
     def from_check(cls, check, *args, **kwargs):
@@ -51,7 +55,6 @@ class CheckResult:
         """Create a CheckResult given a dict. Dict must contain at least the fields in the CheckResult.
         Throws a KeyError if not."""
         return cls(**{field.name: d[field.name] for field in attr.fields(cls)})
-
 
 
 class Timeout(Failure):
@@ -84,7 +87,12 @@ def _timeout(seconds):
         signal.signal(signal.SIGALRM, signal.SIG_DFL)
 
 
-def check(dependency=None, timeout=60, max_log_lines=100):
+def check(
+        dependency=None,
+        timeout=60,
+        max_log_lines=100,
+        points: int = None
+):
     """Mark function as a check.
 
     :param dependency: the check that this check depends on
@@ -121,6 +129,7 @@ def check(dependency=None, timeout=60, max_log_lines=100):
             check50.run("./hello").stdout("[Hh]ello, world!?\\n", "hello, world\\n").exit()
 
     """
+
     def decorator(check):
 
         # Modules are evaluated from the top of the file down, so _check_names will
@@ -156,7 +165,7 @@ def check(dependency=None, timeout=60, max_log_lines=100):
                                     "type": type(e).__name__,
                                     "value": str(e),
                                     "traceback": traceback.format_tb(e.__traceback__),
-                                    "data" : e.payload if hasattr(e, "payload") else {}
+                                    "data": e.payload if hasattr(e, "payload") else {}
                                 }}
             else:
                 result.passed = True
@@ -169,9 +178,15 @@ def check(dependency=None, timeout=60, max_log_lines=100):
 
 
 class CheckRunner:
-    def __init__(self, checks_path, included_files):
+    def __init__(
+            self,
+            checks_path,
+            included_files,
+            points: int = None,
+    ):
         self.checks_path = checks_path
         self.included_files = included_files
+        self.points = points
 
     def run(self, targets=None):
         """
@@ -179,6 +194,7 @@ class CheckRunner:
         Returns a list of CheckResults ordered by declaration order of the checks in the imported module
         targets allows you to limit which checks run. If targets is false-y, all checks are run.
         """
+        print('calling checks')
         graph = self.build_subgraph(targets) if targets else self.dependency_graph
 
         # Ensure that dictionary is ordered by check declaration order (via self.check_names)
@@ -190,32 +206,52 @@ class CheckRunner:
         except (ValueError, TypeError):
             max_workers = None
 
-        with futures.ProcessPoolExecutor(max_workers=max_workers) as executor:
-            # Start all checks that have no dependencies
-            not_done = set(executor.submit(run_check(name, self.checks_spec))
-                           for name in graph[None])
-            not_passed = []
+        # with futures.ProcessPoolExecutor(max_workers=max_workers) as executor:
+        #     # Start all checks that have no dependencies
+        #     not_done = set(executor.submit(run_check(name, self.checks_spec))
+        #                    for name in graph[None])
+        #     not_passed = []
+        #
+        #     while not_done:
+        #         done, not_done = futures.wait(not_done, return_when=futures.FIRST_COMPLETED)
+        #         for future in done:
+        #             # Get result from completed check
+        #             sleep(.1)
+        #             result, state = future.result()
+        #             results[result.name] = result
+        #             if result.passed:
+        #                 # Dispatch dependent checks
+        #                 for child_name in graph[result.name]:
+        #                     not_done.add(executor.submit(
+        #                         run_check(child_name, self.checks_spec, state)))
+        #             else:
+        #                 not_passed.append(result.name)
 
-            while not_done:
-                done, not_done = futures.wait(not_done, return_when=futures.FIRST_COMPLETED)
-                for future in done:
-                    # Get result from completed check
-                    result, state = future.result()
-                    results[result.name] = result
-                    if result.passed:
-                        # Dispatch dependent checks
-                        for child_name in graph[result.name]:
-                            not_done.add(executor.submit(
-                                run_check(child_name, self.checks_spec, state)))
-                    else:
-                        not_passed.append(result.name)
+
+        results = {}
+        not_passed = []
+        not_done = deque(
+            run_check(name, self.checks_spec)
+            for name in graph[None]
+        )
+        while not_done:
+            # result, state = not_done.popleft()()
+            pop = not_done.popleft()
+            result, state = pop()
+            results[result.name] = result
+            if result.passed:
+                not_done.extend(
+                    run_check(name, self.checks_spec, state)
+                    for name in graph[result.name]
+                )
+            else:
+                not_passed.append(result.name)
 
         for name in not_passed:
             self._skip_children(name, results)
 
         # Don't include checks we don't have results for (i.e. in the case that targets != None) in the list.
         return list(filter(None, results.values()))
-
 
     def build_subgraph(self, targets):
         """
@@ -233,7 +269,6 @@ class CheckRunner:
                     subgraph[dep].add(child)
         return subgraph
 
-
     def dependencies_of(self, targets):
         """Get all unique dependencies of the targeted checks (tartgets)."""
         inverse_graph = self._create_inverse_dependency_graph()
@@ -247,7 +282,6 @@ class CheckRunner:
                 curr_check = inverse_graph[curr_check]
         return deps
 
-
     def _create_inverse_dependency_graph(self):
         """Build an inverse dependency map, from a check to its dependency."""
         inverse_dependency_graph = {}
@@ -255,7 +289,6 @@ class CheckRunner:
             for dependent_name in dependents:
                 inverse_dependency_graph[dependent_name] = check_name
         return inverse_dependency_graph
-
 
     def _skip_children(self, check_name, results):
         """
@@ -269,7 +302,6 @@ class CheckRunner:
                                             dependency=check_name,
                                             cause={"rationale": _("can't check until a frown turns upside down")})
                 self._skip_children(name, results)
-
 
     def __enter__(self):
         # Remember the student's directory
@@ -308,7 +340,6 @@ class CheckRunner:
         self.check_descriptions = {name: check.__doc__ for name, check in checks}
 
         return self
-
 
     def __exit__(self, type, value, tb):
         # Destroy the temporary directory for the checks
@@ -350,10 +381,10 @@ class run_check:
 
         # Attributes only need to be passed explicitly to child processes when using spawn
         if multiprocessing.get_start_method() != "spawn":
-           return
+            return
 
         self._attribute_values = [eval(name) for name in self.CROSS_PROCESS_ATTRIBUTES]
-        
+
         # Replace all unpickle-able values with nothing, assuming they've been set externally,
         # and will be set again upon re-importing the checks module
         # https://github.com/cs50/check50/issues/235
@@ -362,9 +393,8 @@ class run_check:
                 pickle.dumps(value)
             except (pickle.PicklingError, AttributeError):
                 self._attribute_values[i] = None
-                
-        self._attribute_values = tuple(self._attribute_values)
 
+        self._attribute_values = tuple(self._attribute_values)
 
     def _set_attributes(self):
         """
@@ -372,11 +402,10 @@ class run_check:
         restore them in the child process.
         """
         if not hasattr(self, "_attribute_values"):
-           return
+            return
 
         for name, val in zip(self.CROSS_PROCESS_ATTRIBUTES, self._attribute_values):
             self._set_attribute(name, val)
-
 
     @staticmethod
     def _set_attribute(name, value):
@@ -389,8 +418,8 @@ class run_check:
 
         setattr(obj, parts[-1], value)
 
-
     def __call__(self):
+        print('call')
         # Restore any attributes from the parent process
         self._set_attributes()
 
@@ -403,6 +432,9 @@ class run_check:
         # Run just the check named self.check_name
         internal.check_running = True
         try:
-            return getattr(mod, self.check_name)(internal.run_root_dir, self.state)
+            check = getattr(mod, self.check_name)
+            result = check(internal.run_root_dir, self.state)
+            print(f'check result: {result}')
+            return result
         finally:
             internal.check_running = False
