@@ -392,9 +392,9 @@ def main():
                     "version": __version__,
                 }
     sys.stdout = stdout
-    print('hello')
+    # print('hello')
     LOGGER.debug(results)
-    print(f'{json.dumps(results, indent=4)}')
+    # print(f'{json.dumps(results, indent=4)}')
 
     # Render output
     file_manager = open(args.output_file, "w") if args.output_file else nullcontext(sys.stdout)

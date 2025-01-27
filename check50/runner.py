@@ -194,7 +194,6 @@ class CheckRunner:
         Returns a list of CheckResults ordered by declaration order of the checks in the imported module
         targets allows you to limit which checks run. If targets is false-y, all checks are run.
         """
-        print('calling checks')
         graph = self.build_subgraph(targets) if targets else self.dependency_graph
 
         # Ensure that dictionary is ordered by check declaration order (via self.check_names)
@@ -419,7 +418,6 @@ class run_check:
         setattr(obj, parts[-1], value)
 
     def __call__(self):
-        print('call')
         # Restore any attributes from the parent process
         self._set_attributes()
 
@@ -434,7 +432,7 @@ class run_check:
         try:
             check = getattr(mod, self.check_name)
             result = check(internal.run_root_dir, self.state)
-            print(f'check result: {result}')
+            # print(f'check result: {result}')
             return result
         finally:
             internal.check_running = False
