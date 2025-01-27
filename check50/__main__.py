@@ -320,6 +320,11 @@ def main():
                         action="version",
                         version=f"%(prog)s {__version__}")
     parser.add_argument("--logout", action=LogoutAction)
+    parser.add_argument(
+        '--classroom',
+        help=_('Push the check results to the specified environment '
+               'variable to be loaded by the GitHub classroom.'),
+    )
 
     args = parser.parse_args()
 
@@ -405,6 +410,44 @@ def main():
                     score=score,
                     max_score=max_score,
                 )
+
+    # {
+    #     "version": 1,
+    #     "status": "pass",
+    #     "max_score": 5,
+    #     "tests": [
+    #         {
+    #             "name": "check50",
+    #             "status": "pass",
+    #             "score": 5,
+    #             "test_code": "check50 ./example --dev -o json",
+    #             "filename": "",
+    #             "line_no": 0,
+    #             "duration": 429
+    #         }
+    #     ]
+    # }
+
+    # todo: how to determine name
+    status = 'pass' if all(
+        result['passed']
+        for result in results['results']
+    ) else 'fail'
+    if args.classroom:
+        tests = dict(
+            name=args.classroom,
+            status=status,
+            score=score,
+        )
+        mapping = dict(
+            version=1,
+            status=status,
+            max_score=max_score,
+            tests=[tests],
+        )
+        os.environ[args.classroom] = json.dumps(mapping)
+
+
     sys.stdout = stdout
     # print('hello')
     LOGGER.debug(results)
