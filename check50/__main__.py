@@ -393,7 +393,6 @@ def main():
                 score = sum(
                     result['score']
                     for result in dicts
-                    # if result['score'] is not None
                 )
                 max_score = sum(
                     result['max_score']
