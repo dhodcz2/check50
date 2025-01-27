@@ -153,13 +153,13 @@ def await_results(commit_hash, slug, pings=45, sleep=2):
             # Terminate if no response
             raise _exceptions.Error(
                 _("check50 is taking longer than normal!\n"
-                "See https://submit.cs50.io/check50/{} for more detail").format(commit_hash))
+                  "See https://submit.cs50.io/check50/{} for more detail").format(commit_hash))
 
     except JSONDecodeError:
         # Invalid JSON object received from submit.cs50.io
         raise _exceptions.Error(
             _("Sorry, something's wrong, please try again.\n"
-            "If the problem persists, please visit our status page https://cs50.statuspage.io for more information."))
+              "If the problem persists, please visit our status page https://cs50.statuspage.io for more information."))
 
     if not results["check50"]:
         raise _exceptions.RemoteCheckError(results)
@@ -205,7 +205,7 @@ def raise_invalid_slug(slug, offline=False):
 
     if offline:
         msg += _("\nIf you are confident the slug is correct and you have an internet connection," \
-                " try running without --offline.")
+                 " try running without --offline.")
 
     raise _exceptions.Error(msg)
 
@@ -386,11 +386,26 @@ def main():
 
             with CheckRunner(checks_file, included_files) as check_runner:
                 check_results = check_runner.run(args.target)
-                results = {
-                    "slug": internal.slug,
-                    "results": [attr.asdict(result) for result in check_results],
-                    "version": __version__,
-                }
+                dicts = [
+                    attr.asdict(result)
+                    for result in check_results
+                ]
+                score = sum(
+                    result['score']
+                    for result in dicts
+                    # if result['score'] is not None
+                )
+                max_score = sum(
+                    result['max_score']
+                    for result in dicts
+                )
+                results = dict(
+                    slug=internal.slug,
+                    results=dicts,
+                    version=__version__,
+                    score=score,
+                    max_score=max_score,
+                )
     sys.stdout = stdout
     # print('hello')
     LOGGER.debug(results)
@@ -428,6 +443,7 @@ def main():
                     termcolor.cprint(_("To see more detailed results go to {}").format(url), "white", attrs=["bold"])
 
     sys.exit(should_fail(results))
+
 
 def should_fail(results):
     return "error" in results or any(not result["passed"] for result in results["results"])

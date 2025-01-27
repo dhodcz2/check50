@@ -38,7 +38,8 @@ class CheckResult:
     cause = attr.ib(default=None)
     data = attr.ib(default=attr.Factory(dict))
     dependency = attr.ib(default=None)
-    points = attr.ib(default=None)
+    max_score = attr.ib(default=0)
+    score = attr.ib(default=0)
 
     @classmethod
     def from_check(cls, check, *args, **kwargs):
@@ -91,7 +92,7 @@ def check(
         dependency=None,
         timeout=60,
         max_log_lines=100,
-        points: int = None
+        points: int = 0
 ):
     """Mark function as a check.
 
@@ -142,6 +143,7 @@ def check(
             # Result template
             result = CheckResult.from_check(check)
             # Any shared (returned) state
+            result.max_score = points
             state = None
 
             try:
@@ -169,6 +171,7 @@ def check(
                                 }}
             else:
                 result.passed = True
+                result.score = points
             finally:
                 result.log = _log if len(_log) <= max_log_lines else ["..."] + _log[-max_log_lines:]
                 result.data = _data
@@ -182,11 +185,9 @@ class CheckRunner:
             self,
             checks_path,
             included_files,
-            points: int = None,
     ):
         self.checks_path = checks_path
         self.included_files = included_files
-        self.points = points
 
     def run(self, targets=None):
         """
@@ -198,12 +199,12 @@ class CheckRunner:
 
         # Ensure that dictionary is ordered by check declaration order (via self.check_names)
         # NOTE: Requires CPython 3.6. If we need to support older versions of Python, replace with OrderedDict.
-        results = {name: None for name in self.check_names}
-
-        try:
-            max_workers = int(os.environ.get("CHECK50_WORKERS"))
-        except (ValueError, TypeError):
-            max_workers = None
+        # results = {name: None for name in self.check_names}
+        #
+        # try:
+        #     max_workers = int(os.environ.get("CHECK50_WORKERS"))
+        # except (ValueError, TypeError):
+        #     max_workers = None
 
         # with futures.ProcessPoolExecutor(max_workers=max_workers) as executor:
         #     # Start all checks that have no dependencies
