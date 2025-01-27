@@ -411,7 +411,12 @@ def main():
     # print(f'{json.dumps(results, indent=4)}')
 
     # Render output
-    file_manager = open(args.output_file, "w") if args.output_file else nullcontext(sys.stdout)
+    if args.output_file:
+        os.makedirs(os.path.dirname(args.output_file), exist_ok=True)
+        file_manager = open(args.output_file, "w")
+    else:
+        file_manager = nullcontext(sys.stdout)
+
     with file_manager as output_file:
         for output in args.output:
             if output == "json":
