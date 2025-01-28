@@ -360,7 +360,12 @@ def main():
         with lib50.ProgressBar("Checking") if "ansi" in args.output else nullcontext():
             # If developing, assume slug is a path to check_dir
             if args.dev:
-                internal.check_dir = Path(internal.slug).expanduser().resolve()
+                # internal.check_dir = Path(internal.slug).expanduser().resolve()
+                internal.check_dir = (
+                    Path(internal.slug)
+                    .expanduser()
+                    .resolve()
+                )
                 if not internal.check_dir.is_dir():
                     raise _exceptions.Error(_("{} is not a directory").format(internal.check_dir))
             # Otherwise have lib50 create a local copy of slug
@@ -390,17 +395,6 @@ def main():
             included_files = lib50.files(config.get("files"))[0]
 
             # Create a working_area (temp dir) named - with all included student files
-            # with CheckRunner(checks_file, included_files) as check_runner, \
-            #         contextlib.redirect_stdout(LoggerWriter(LOGGER, logging.NOTSET)), \
-            #         contextlib.redirect_stderr(LoggerWriter(LOGGER, logging.NOTSET)):
-            #
-            #     check_results = check_runner.run(args.target)
-            #     results = {
-            #         "slug": internal.slug,
-            #         "results": [attr.asdict(result) for result in check_results],
-            #         "version": __version__
-            #     }
-
             with CheckRunner(checks_file, included_files) as check_runner:
                 check_results = check_runner.run(args.target)
                 dicts = [
@@ -422,29 +416,14 @@ def main():
                     score=score,
                     max_score=max_score,
                 )
-
-    # {
-    #     "version": 1,
-    #     "status": "pass",
-    #     "max_score": 5,
-    #     "tests": [
-    #         {
-    #             "name": "check50",
-    #             "status": "pass",
-    #             "score": 5,
-    #             "test_code": "check50 ./example --dev -o json",
-    #             "filename": "",
-    #             "line_no": 0,
-    #             "duration": 429
-    #         }
-    #     ]
-    # }
+                results
 
     # todo: how to determine name
     status = 'pass' if all(
         result['passed']
         for result in results['results']
     ) else 'fail'
+
     if args.classroom:
         tests = dict(
             name=args.classroom.stem,
@@ -457,21 +436,13 @@ def main():
             max_score=max_score,
             tests=[tests],
         )
-        # write mapping to args.classroome
-        # with open(f'{args.classroom}.json', 'w') as f:
-        #     f.write(json.dumps(mapping, indent=4))
-        # with open(f'{args.classroom}.json', ) as f:
-        #     print(f.read())
         with open(args.classroom, 'w') as f:
             f.write(json.dumps(mapping, indent=4))
         with open(args.classroom) as f:
             print(f.read())
-        print()
 
     sys.stdout = stdout
-    # print('hello')
     LOGGER.debug(results)
-    # print(f'{json.dumps(results, indent=4)}')
 
     # Render output
     if args.output_file:
