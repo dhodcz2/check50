@@ -327,6 +327,18 @@ def main():
     )
 
     args = parser.parse_args()
+    if args.classroom:
+        classroom = Path(args.classroom)
+        if not classroom.suffix:
+            classroom = (
+                classroom
+                .expanduser()
+                .resolve()
+                .with_suffix('.json')
+            )
+        elif classroom.suffix != '.json':
+            raise ValueError('Invalid classroom file extension')
+        args.classroom = classroom
 
     internal.slug = args.slug
 
@@ -435,7 +447,7 @@ def main():
     ) else 'fail'
     if args.classroom:
         tests = dict(
-            name=args.classroom,
+            name=args.classroom.stem,
             status=status,
             score=score,
         )
@@ -445,8 +457,16 @@ def main():
             max_score=max_score,
             tests=[tests],
         )
-        os.environ[args.classroom] = json.dumps(mapping)
-
+        # write mapping to args.classroome
+        # with open(f'{args.classroom}.json', 'w') as f:
+        #     f.write(json.dumps(mapping, indent=4))
+        # with open(f'{args.classroom}.json', ) as f:
+        #     print(f.read())
+        with open(args.classroom, 'w') as f:
+            f.write(json.dumps(mapping, indent=4))
+        with open(args.classroom) as f:
+            print(f.read())
+        print()
 
     sys.stdout = stdout
     # print('hello')
