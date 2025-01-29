@@ -416,6 +416,7 @@ def main():
                     score=score,
                     max_score=max_score,
                 )
+                print(results)
                 results
 
     # todo: how to determine name
@@ -424,11 +425,17 @@ def main():
         for result in results['results']
     ) else 'fail'
 
+
     if args.classroom:
         tests = dict(
             name=args.classroom.stem,
             status=status,
             score=score,
+
+            test_code='',
+            filename='',
+            line_no=0,
+            duration=0,
         )
         mapping = dict(
             version=1,
