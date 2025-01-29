@@ -301,13 +301,13 @@ def generate_feedback(indict: dict, outfile: Path):
     outfile.parent.mkdir(parents=True, exist_ok=True)
     with open(outfile, "w") as f:
         f.write("\n".join(txt) + "\n")
-    outfile
     with open(outfile) as f:
         print(f.read())
 
 
-def json_path(
-        path: str
+def as_path(
+        path: str | Path,
+        extension: str,
 ) -> Path:
     path = Path(path)
     if not path.suffix:
@@ -315,9 +315,9 @@ def json_path(
             path
             .expanduser()
             .resolve()
-            .with_suffix('.json')
+            .with_suffix(extension)
         )
-    elif path.suffix != '.json':
+    elif path.suffix != extension:
         raise ValueError('Invalid path file extension')
     return path
 
@@ -382,9 +382,9 @@ def main():
 
     args = parser.parse_args()
     if args.autograder:
-        args.autograder = json_path(args.autograder)
+        args.autograder = as_path(args.autograder, '.json')
     if args.feedback:
-        args.feedback = json_path(args.feedback)
+        args.feedback = as_path(args.feedback, '.txt')
 
     internal.slug = args.slug
 
