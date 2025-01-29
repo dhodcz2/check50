@@ -292,8 +292,10 @@ def generate_feedback(indict: dict, outfile: Path):
                 # txt.append("    Cause:")
                 # txt.append(f"        - Expected: \"{result['cause'].get('expected', 'N/A')}\"")
                 # txt.append(f"        - Actual: \"{result['cause'].get('actual', 'N/A')}\"")
+                # if result["cause"].get("help") is not None:
+                #     txt.append(f"        - Help: {result['cause']['help']}")
                 if result["cause"].get("help") is not None:
-                    txt.append(f"        - Help: {result['cause']['help']}")
+                    txt.append(f"    Help: {result['cause']['help']}")
             # if result["log"]:
             #     txt.append("    Logs:")
             #     for log_entry in result["log"]:
