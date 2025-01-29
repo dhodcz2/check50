@@ -271,39 +271,39 @@ class LoggerWriter:
         pass
 
 
-def generate_feedback(
-        indict: dict,
-        outfile: Path
-):
-    feedback = {
-        "version": indict["version"],
-        "total_score": f"{indict['score']} / {indict['max_score']}",
-        "results": []
-    }
+def generate_feedback(indict: dict, outfile: Path):
+    txt = [
+        f"Autograder Results (Version {indict['version']})",
+        "-" * 35,
+        f"Total Score: {indict['score']} / {indict['max_score']}\n"
+    ]
 
     for result in indict["results"]:
-        entry = {
-            "status": "✅" if result["passed"] else "❌",
-            "name": f"{result['name']}.py",
-            "description": result["description"],
-            "score": f"{result['score']} / {result['max_score']}"
-        }
+        status = "✅" if result["passed"] else "❌"
+        txt.append(f"{status} {result['name']}.py")
+        txt.append(f"    Description: {result['description']}")
+        txt.append(f"    Score: {result['score']}/{result['max_score']}")
 
         if not result["passed"]:
-            entry["cause"] = {
-                "expected": result["cause"].get("expected", "N/A"),
-                "actual": result["cause"].get("actual", "N/A")
-            }
-            if result["cause"].get("help") is not None:
-                entry["cause"]["help"] = result["cause"]["help"]
-            entry["logs"] = result["log"]
+            if result["cause"]:
+                txt.append("    Cause:")
+                txt.append(f"        - Expected: \"{result['cause'].get('expected', 'N/A')}\"")
+                txt.append(f"        - Actual: \"{result['cause'].get('actual', 'N/A')}\"")
+                if result["cause"].get("help") is not None:
+                    txt.append(f"        - Help: {result['cause']['help']}")
+            if result["log"]:
+                txt.append("    Logs:")
+                for log_entry in result["log"]:
+                    txt.append(f"        - {log_entry}")
 
-
-        feedback["results"].append(entry)
+        txt.append("-" * 35)
 
     outfile.parent.mkdir(parents=True, exist_ok=True)
     with open(outfile, "w") as f:
-        json.dump(feedback, f, indent=4, ensure_ascii=False)
+        f.write("\n".join(txt) + "\n")
+    outfile
+    with open(outfile) as f:
+        print(f.read())
 
 
 def json_path(
@@ -492,11 +492,13 @@ def main():
         args.autograder.parent.mkdir(parents=True, exist_ok=True)
         with open(args.autograder, 'w') as f:
             f.write(json.dumps(mapping, indent=4))
-        with open(args.autograder) as f:
-            print(f.read())
+    else:
+        raise ValueError
 
     if args.feedback:
         generate_feedback(results, args.feedback)
+    else:
+        raise ValueError
 
     sys.stdout = stdout
     LOGGER.debug(results)
