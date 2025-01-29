@@ -23,7 +23,6 @@ import termcolor
 from check50 import _exceptions, internal, renderer, __version__
 from check50.contextmanagers import nullcontext
 from check50.runner import CheckRunner
-
 LOGGER = logging.getLogger("check50")
 
 lib50.set_local_path(os.environ.get("CHECK50_PATH", "~/.local/share/check50"))
@@ -490,6 +489,7 @@ def main():
             tests=[tests],
         )
 
+        args.autograder.parent.mkdir(parents=True, exist_ok=True)
         with open(args.autograder, 'w') as f:
             f.write(json.dumps(mapping, indent=4))
         with open(args.autograder) as f:
