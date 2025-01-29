@@ -284,17 +284,20 @@ def generate_feedback(indict: dict, outfile: Path):
         txt.append(f"    Description: {result['description']}")
         txt.append(f"    Score: {result['score']}/{result['max_score']}")
 
+        # commented out because revealing the expected outcomes to the
+        # student may promote cheating
+
         if not result["passed"]:
             if result["cause"]:
-                txt.append("    Cause:")
-                txt.append(f"        - Expected: \"{result['cause'].get('expected', 'N/A')}\"")
-                txt.append(f"        - Actual: \"{result['cause'].get('actual', 'N/A')}\"")
+                # txt.append("    Cause:")
+                # txt.append(f"        - Expected: \"{result['cause'].get('expected', 'N/A')}\"")
+                # txt.append(f"        - Actual: \"{result['cause'].get('actual', 'N/A')}\"")
                 if result["cause"].get("help") is not None:
                     txt.append(f"        - Help: {result['cause']['help']}")
-            if result["log"]:
-                txt.append("    Logs:")
-                for log_entry in result["log"]:
-                    txt.append(f"        - {log_entry}")
+            # if result["log"]:
+            #     txt.append("    Logs:")
+            #     for log_entry in result["log"]:
+            #         txt.append(f"        - {log_entry}")
 
         txt.append("-" * 35)
 
