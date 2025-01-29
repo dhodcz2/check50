@@ -272,6 +272,57 @@ class LoggerWriter:
         pass
 
 
+def generate_feedback(
+        indict: dict,
+        outfile: Path
+):
+    feedback = {
+        "version": indict["version"],
+        "total_score": f"{indict['score']} / {indict['max_score']}",
+        "results": []
+    }
+
+    for result in indict["results"]:
+        entry = {
+            "status": "✅" if result["passed"] else "❌",
+            "name": f"{result['name']}.py",
+            "description": result["description"],
+            "score": f"{result['score']} / {result['max_score']}"
+        }
+
+        if not result["passed"]:
+            entry["cause"] = {
+                "expected": result["cause"].get("expected", "N/A"),
+                "actual": result["cause"].get("actual", "N/A")
+            }
+            if result["cause"].get("help") is not None:
+                entry["cause"]["help"] = result["cause"]["help"]
+            entry["logs"] = result["log"]
+
+
+        feedback["results"].append(entry)
+
+    outfile.parent.mkdir(parents=True, exist_ok=True)
+    with open(outfile, "w") as f:
+        json.dump(feedback, f, indent=4, ensure_ascii=False)
+
+
+def json_path(
+        path: str
+) -> Path:
+    path = Path(path)
+    if not path.suffix:
+        path = (
+            path
+            .expanduser()
+            .resolve()
+            .with_suffix('.json')
+        )
+    elif path.suffix != '.json':
+        raise ValueError('Invalid path file extension')
+    return path
+
+
 def main():
     parser = argparse.ArgumentParser(prog="check50", formatter_class=argparse.RawTextHelpFormatter)
 
@@ -321,24 +372,20 @@ def main():
                         version=f"%(prog)s {__version__}")
     parser.add_argument("--logout", action=LogoutAction)
     parser.add_argument(
-        '--classroom',
+        '--autograder',
         help=_('Push the check results to the specified environment '
-               'variable to be loaded by the GitHub classroom.'),
+               'variable to be loaded by the GitHub autograder.'),
+    )
+    parser.add_argument(
+        '--feedback',
+        help=_('Generate a feedback json file with the check results.'),
     )
 
     args = parser.parse_args()
-    if args.classroom:
-        classroom = Path(args.classroom)
-        if not classroom.suffix:
-            classroom = (
-                classroom
-                .expanduser()
-                .resolve()
-                .with_suffix('.json')
-            )
-        elif classroom.suffix != '.json':
-            raise ValueError('Invalid classroom file extension')
-        args.classroom = classroom
+    if args.autograder:
+        args.autograder = json_path(args.autograder)
+    if args.feedback:
+        args.feedback = json_path(args.feedback)
 
     internal.slug = args.slug
 
@@ -417,7 +464,6 @@ def main():
                     max_score=max_score,
                 )
                 print(results)
-                results
 
     # todo: how to determine name
     status = 'pass' if all(
@@ -425,28 +471,32 @@ def main():
         for result in results['results']
     ) else 'fail'
 
+    if args.autograder:
 
-    if args.classroom:
         tests = dict(
-            name=args.classroom.stem,
+            name=args.autograder.stem,
             status=status,
             score=score,
-
             test_code='',
             filename='',
             line_no=0,
             duration=0,
         )
+
         mapping = dict(
             version=1,
             status=status,
             max_score=max_score,
             tests=[tests],
         )
-        with open(args.classroom, 'w') as f:
+
+        with open(args.autograder, 'w') as f:
             f.write(json.dumps(mapping, indent=4))
-        with open(args.classroom) as f:
+        with open(args.autograder) as f:
             print(f.read())
+
+    if args.feedback:
+        generate_feedback(results, args.feedback)
 
     sys.stdout = stdout
     LOGGER.debug(results)
