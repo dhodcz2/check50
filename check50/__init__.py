@@ -38,7 +38,7 @@ from ._api import (
 
 
 from . import regex
-from .runner import check
+from .runner import check, delayed
 from pexpect import EOF
 
 __all__ = ["import_checks", "data", "exists", "hash", "include", "regex",

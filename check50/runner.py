@@ -24,6 +24,7 @@ from . import internal, _exceptions, __version__
 from ._api import log, Failure, _copy, _log, _data
 # import sleep
 from time import sleep
+from typing import *
 
 _check_names = []
 
@@ -176,8 +177,55 @@ def check(
                 result.log = _log if len(_log) <= max_log_lines else ["..."] + _log[-max_log_lines:]
                 result.data = _data
                 return result, state
+
         return wrapper
+
     return decorator
+
+
+# def delayed(
+#         dependency=None,
+#         timeout=60,
+#         max_log_lines=100,
+#         points: int = 0
+# ):
+#     """Mark function as a check."""
+#
+
+class delayed:
+    __wrapped__ = None
+
+    def __init__(
+            self,
+            dependency: str = None,
+            timeout: int = 60,
+            max_log_lines: int = 100,
+            points: int = 0
+    ):
+        self.dependency = dependency
+        self.timeout = timeout
+        self.max_log_lines = max_log_lines
+        self.points = points
+
+    def __call__(self, func) -> Self:
+        functools.update_wrapper(self, func)
+        return self.check
+
+    def check(
+            self,
+            *args,
+            **kwargs
+    ):
+        func = functools.partial(self.__wrapped__, *args, **kwargs)
+        # so that it gets the __name__ for check
+        functools.update_wrapper(func, self.__wrapped__)
+        result = check(
+            dependency=self.dependency,
+            timeout=self.timeout,
+            max_log_lines=self.max_log_lines,
+            points=self.points
+        )(func)
+        return result
 
 
 class CheckRunner:
@@ -226,7 +274,6 @@ class CheckRunner:
         #                         run_check(child_name, self.checks_spec, state)))
         #             else:
         #                 not_passed.append(result.name)
-
 
         results = {}
         not_passed = []
